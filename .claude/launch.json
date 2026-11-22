@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sea-wanderer",
+      "autoPort": true,
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-c",
+        "import os,http.server,socketserver;socketserver.TCPServer.allow_reuse_address=True;p=int(os.environ.get('PORT','8766'));socketserver.TCPServer(('',p),http.server.SimpleHTTPRequestHandler).serve_forever()"
+      ]
+    }
+  ]
+}
