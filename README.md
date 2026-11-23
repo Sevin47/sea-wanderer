@@ -30,6 +30,42 @@ Older builds are kept in `backup/`:
 
 The simulation pauses while the menu, tree, crew panel, a port, or an encounter card is open.
 
+### Hands-off
+
+**Hands-off** in the menu lets the game play itself. With it on:
+- Battles decide themselves ("decide for me").
+- Once you have left the game alone for 6 s in port, she runs the usual errands (sell charts, repair,
+  restock, hire), then fits the cheapest upgrades she can afford while keeping enough gold to restock.
+- After 45 s with no input, open panels and the menu close and the camera follows her again.
+- A lost voyage makes way for a new sea after 15 s, a won one after 40 s.
+
+Any input resets those timers, so you can still step in. Turn it off and ports and battles wait for you
+again. It is saved with your settings.
+
+In headless runs, the hands-off autopilot won 6 of 7 voyages, each in 64–82 minutes.
+
+## Desktop wallpaper (Windows)
+
+`wallpaper/SeaWandererWallpaper.exe` runs the game as a live desktop background. It needs nothing
+beyond Windows itself: Edge shows the page, and the program is built with the C# compiler that comes
+with Windows (`wallpaper/build.cmd`; the exe is not committed).
+
+- Edge opens `index.html?wallpaper` full screen with its own profile, and the program moves that window
+  behind the desktop icons.
+- A mouse hook passes clicks, drags and the wheel on empty desktop to the game. Clicks on desktop icons
+  and right-clicks still go to the desktop. Edge drops wheel messages there, so each notch is sent as
+  F13 or F14, and the game zooms on the pointer.
+- While a maximised or full-screen window covers the main screen, the program hides the window and the
+  game pauses.
+- If Edge closes or Explorer restarts, it starts again by itself.
+- The tray icon has Pause, Reload and Quit. A log is at `%LOCALAPPDATA%\SeaWandererWallpaper\wallpaper.log`.
+
+`?wallpaper` mode in the game:
+- It has its own save (`fogbound.wallpaper`) and settings, with sound off.
+- Hands-off is always on.
+- It draws at most 30 frames a second, and keeps the HUD clear of the taskbar and of the icon columns
+  (`&left=`, `&bottom=`, both in screen pixels).
+
 ## Goods and upkeep
 
 She carries gold and four goods. Goods share the hold: 100 at the start, 600 with every Holds node.

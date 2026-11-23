@@ -222,6 +222,14 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
   .mk td:has(.mb){white-space:normal}
   .mb{padding:6px 7px;margin:2px 0 2px 2px}
 }
+/* wallpaper mode: keep clear of the desktop icons on the left and the taskbar at the bottom */
+body.wp #hud{left:calc(14px + var(--wl,0px))}
+body.wp #log{left:calc(14px + var(--wl,0px));bottom:calc(14px + var(--wb,0px))}
+body.wp #bar{bottom:calc(12px + var(--wb,0px))}
+body.wp #hail{bottom:calc(76px + var(--wb,0px))}
+body.wp #rose{bottom:calc(96px + var(--wb,0px))}
+body.wp #tinfo{bottom:calc(18px + var(--wb,0px))}
+body.wp .overlay{padding:0 0 var(--wb,0px) var(--wl,0px);box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -263,6 +271,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
   <button class="big" id="mPlay">Set Sail</button>
   <button class="big alt" id="mNew">New Sea</button>
   <button class="big alt" id="mAuto">Battles: Ask Me</button>
+  <button class="big alt" id="mHands">Hands-off: Off</button>
   <button class="big alt" id="mSound">Sound: On</button>
   <div class="help">
     The <b>Wanderer</b> picks her own course. Everything she charts can be <b>sold to a port's chart office</b>.
@@ -270,7 +279,8 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-actio
     and her guns fire <b style="color:var(--metal)">metal</b>. Landing parties gather supplies on islands, pirates carry plunder,
     and merchants and port cities trade. Spend it all in <b>Charts &amp; Rigging</b>, including room for more crew.<br>
     <b style="color:var(--red)">Black sails</b> fight to the death. You choose to fight or flee; the rest is up to your preparation.
-    <b>If the Wanderer sinks, the voyage is over.</b><br><br>
+    <b>If the Wanderer sinks, the voyage is over.</b>
+    Turn on <b>Hands-off</b> and she makes every decision herself: port calls, refits and battles.<br><br>
     <b>Drag</b> to pan &middot; <b>wheel / pinch</b> to zoom, all the way out to the chart &middot; <b>F</b> follow &middot;
     <b>Space</b> fit the charted sea &middot; <b>U</b> upgrades &middot; <b>C</b> crew &middot; <b>click</b> a ship for details &middot; <b>M</b> sound &middot; <b>Esc</b> menu
   </div>
@@ -315,8 +325,9 @@ const THRB = 153, THR = THRB / 255;           // elevation byte at which land be
 const SX = 512.5, SZ = 512.5;                  // home lagoon (spawn)
 const HX = 512.5, HZ = 504.6;                  // home isle
 const R = 0.3;                                 // ship collision radius (cells)
-// ?test keeps a test voyage apart from the real one
-const SAVE_KEY = /[?&]test\b/.test(location.search) ? 'fogbound.test' : 'fogbound.v4', PREF_KEY = 'fogbound.prefs';
+// ?test keeps a test voyage apart from the real one; ?wallpaper runs as a desktop background with a voyage of its own
+const WP = /[?&]wallpaper\b/.test(location.search);
+const SAVE_KEY = /[?&]test\b/.test(location.search) ? 'fogbound.test' : WP ? 'fogbound.wallpaper' : 'fogbound.v4', PREF_KEY = WP ? 'fogbound.wallpaper.prefs' : 'fogbound.prefs';
 const BS = 16, BN = N / BS;                    // exploration blocks
 const ITEM_CAP = 1500, RIVAL_HIDDEN = 200;
 const COMPASS_TOTAL = 12, RELIC_TOTAL = 40, WRECK_TOTAL = 40;
@@ -2076,7 +2087,7 @@ function encounter(r) {
   if (S.boat) { if (S.boat.task === 'land') S.boat.frac = S.boat.st === 'ashore' ? clamp(1 - S.boat.t / 8, 0, 1) : S.boat.st === 'back' ? 1 : 0; stowBoat(); }
   S.enc = { r, odds: battleOdds(r, d, 300), caught: battleOdds(r, d, 200, true), fp: fleeChance(r), d };
   sfx.alarm();
-  if (prefs.auto) { decideEncounter(autoChoice(S.enc)); return; }
+  if (prefs.auto || handsOff()) { decideEncounter(autoChoice(S.enc)); return; }
   renderEncounter(); show('encounter', true);
 }
 // "decide for me": fight when the risk is small, otherwise whichever choice is less likely to lose her
@@ -2910,11 +2921,16 @@ function refreshMenu() {
   $('mPlay').textContent = has ? 'Continue' : 'Set Sail';
   $('mInfo').textContent = has ? `Sea #${S.seed} · day ${day()} · ${pctCharted()} charted · ${S.hands.length} hands` : '';
   $('mSound').textContent = 'Sound: ' + (prefs.sound ? 'On' : 'Off');
-  $('mAuto').textContent = 'Battles: ' + (prefs.auto ? 'Decide for Me' : 'Ask Me');
+  $('mAuto').textContent = 'Battles: ' + (prefs.auto || handsOff() ? 'Decide for Me' : 'Ask Me');
+  $('mHands').textContent = 'Hands-off: ' + (handsOff() ? 'On' : 'Off');
+  $('mAuto').disabled = handsOff(); $('mAuto').style.opacity = handsOff() ? .45 : 1;
 }
 $('mPlay').onclick = () => { if (!S || S.over) startNew(); show('menu', false); canvas.focus(); };
 $('mNew').onclick = () => { if (S && !S.over && !confirm('Abandon this voyage and chart a new sea?')) return; startNew(); show('menu', false); };
 $('mAuto').onclick = () => { prefs.auto = !prefs.auto; savePrefs(); refreshMenu(); };
+$('mHands').onclick = () => { prefs.hands = !prefs.hands; savePrefs(); refreshMenu();
+  log(prefs.hands ? 'Hands-off: the Wanderer makes every decision herself. Touch nothing and she trades, refits and fights on her own.' : 'Hands-off is off: ports and battles wait for you again.'); };
+if (WP) $('mHands').style.display = 'none';
 $('mSound').onclick = () => { toggleSound(); refreshMenu(); };
 $('wKeep').onclick = () => show('win', false);
 $('wNew').onclick = () => { show('win', false); startNew(); };
@@ -2922,7 +2938,9 @@ $('wNew').onclick = () => { show('win', false); startNew(); };
 /* =====================================================================
    Sound (synthesised)
    ===================================================================== */
-let prefs = { sound: true, auto: false };
+let prefs = { sound: !WP, auto: WP, hands: false };
+// hands-off: the game makes every decision itself (always so as a wallpaper)
+const handsOff = () => WP || prefs.hands;
 try { prefs = Object.assign(prefs, JSON.parse(localStorage.getItem(PREF_KEY) || '{}')); } catch (e) {}
 function savePrefs() { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch (e) {} }
 function toggleSound() { prefs.sound = !prefs.sound; savePrefs(); log('Sound ' + (prefs.sound ? 'on' : 'off') + '.'); }
@@ -3089,6 +3107,52 @@ function resize() {
 }
 addEventListener('resize', resize); resize();
 let last = performance.now(), acc = 0, saveT = 0, wakeT = 0, itemsT = 0, hudT = 0, bhT = 0;
+
+/* ---- hands-off play (a menu setting, and always on as a wallpaper) ----
+   Nothing waits on the player for long: port calls run themselves once the player has been still a few
+   seconds, battles decide themselves, idle panels close, and a lost voyage makes way for a new sea. */
+let wpDrawn = 0, idleT = 0, autoWait = 0;
+const IDLE_CLOSE = 45;
+let wpX = innerWidth / 2, wpY = innerHeight / 2;
+for (const ev of ['pointerdown', 'pointermove', 'wheel']) addEventListener(ev, e => { idleT = 0; wpX = e.clientX; wpY = e.clientY; }, { capture: true, passive: true });
+addEventListener('keydown', () => { idleT = 0; }, { capture: true, passive: true });
+// Edge drops wheel messages for a window that sits behind the desktop icons, so the wallpaper app sends
+// each notch of the wheel as F13 (in) or F14 (out), and the zoom centres on wherever the pointer last was
+if (WP) addEventListener('keydown', e => {
+  if (e.key !== 'F13' && e.key !== 'F14') return;
+  e.preventDefault(); idleT = 0;
+  if (!paused()) zoomAt(Math.exp(e.key === 'F13' ? -.12 : .12), wpX, wpY);
+}, true);
+function wpInsets() {
+  const q = new URLSearchParams(location.search), px = k => Math.max(0, +q.get(k) || 0) / devicePixelRatio + 'px';
+  document.body.style.setProperty('--wl', px('left')); document.body.style.setProperty('--wb', px('bottom'));
+}
+// in port: the usual errands, then the cheapest upgrades she can afford while still leaving gold to restock
+function autoPort(p) {
+  const did = portUsual(p), got = [], w = wants();
+  const want = { food: Math.max(w.food, ST.foodDay * 18), wood: w.wood, metal: w.metal, rum: 0 };
+  const worth = n => n.cost.gold + GOODS.reduce((v, g) => v + (n.cost[g] || 0) * GOOD[g].base, 0);
+  const refill = c => GOODS.reduce((v, g) => v + Math.max(0, want[g] - Math.max(0, S.res[g] - (c[g] || 0))) * price(p, g), 0);
+  for (let k = 0; k < 8; k++) {
+    const n = TREE.nodes.filter(n => n.id !== 'root' && nodeState(n) === 'open' && canBuy(n.cost)
+      && S.gold - n.cost.gold - shortCost(n.cost, p) - refill(n.cost) - yardPrice() >= 30).sort((a, b) => worth(a) - worth(b))[0];
+    if (!n || !buyNode(n.id)) break;
+    got.push(n.name);
+  }
+  if (got.length) portUsual(p);
+  if (did.length || got.length) log(`In ${p.name}: ${did.concat(got.map(n => 'fitted ' + n)).join(', ')}.`, 'trade');
+  undock();
+}
+function autoTick(dt) {
+  if (!S || isOn('loading')) return;
+  idleT += dt;
+  if (isOn('over')) { if ((autoWait += dt) > 15) { autoWait = 0; show('over', false); startNew(); } return; }
+  if (isOn('win')) { if ((autoWait += dt) > 40) { autoWait = 0; show('win', false); startNew(); } return; }
+  if (idleT > IDLE_CLOSE) { for (const id of ['tree', 'crew', 'menu']) if (isOn(id)) show(id, false); if (!S.follow) setFollow(true); }
+  if (S.enc && idleT > IDLE_CLOSE) { decideEncounter(autoChoice(S.enc)); return; }
+  if (isOn('port') && S.docked && !isOn('tree') && idleT > 6) { if ((autoWait += dt) > 2) { autoWait = 0; autoPort(S.docked); } return; }
+  autoWait = 0;
+}
 const paused = () => isOn('menu') || isOn('tree') || isOn('win') || isOn('crew') || isOn('port') || isOn('encounter') || isOn('over') || isOn('loading');
 function poseShip(o, bobId, d, sc, t, sink = 0) {
   _v.set(o.x, Math.sin(t * 1.7 + bobId) * .03 - sink * .32, o.z);
@@ -3168,6 +3232,7 @@ function updateShipsVisual(dt) {
 }
 function frame(now, manual) {
   if (!manual) requestAnimationFrame(frame);
+  if (WP && !manual) { if (now - wpDrawn < 31) return; wpDrawn = now; }   // a background needs no more than 30 frames a second
   const dt = Math.min(.05, (now - last) / 1000); last = now;
   if (!S) { renderer.render(scene, camera); return; }
   const P = paused();
@@ -3191,6 +3256,7 @@ function frame(now, manual) {
   updateParticles(P ? 0 : dt);
   flushFog();
   updateLabels(dt);
+  if (handsOff()) autoTick(dt); else idleT = 0;
   hudT -= dt; if (hudT <= 0) { hudT = .25; updateHUD(); }
   bhT -= dt; if (battle && bhT <= 0) { bhT = .1; renderBattleHUD(); }
   renderer.render(scene, camera);
@@ -3199,12 +3265,13 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) save(
 addEventListener('beforeunload', save);
 
 placeCamera();
-if (loadSave()) { show('menu', true); log('Welcome back, Captain.'); }
+if (WP) { document.body.classList.add('wp'); wpInsets(); if (loadSave()) log('Welcome back, Captain.'); else startNew(); }
+else if (loadSave()) { show('menu', true); log('Welcome back, Captain.'); }
 else show('menu', true);
 requestAnimationFrame(frame);
 // debug hooks: step the simulation and draw a frame without rAF (a hidden tab never fires it)
 window.__fog = { get S() { return S; }, get W() { return W; }, get ST() { return ST; }, get goal() { return goal; }, get battle() { return battle; }, get hail() { return hail; },
-  cam, fitView, placeCamera, buyNode, save, nodeState, canPay, paused, nodes: () => TREE.nodes,
+  cam, fitView, placeCamera, buyNode, save, nodeState, canPay, paused, nodes: () => TREE.nodes, autoTick, autoPort, get idleT() { return idleT; }, set idleT(v) { idleT = v; },
   step(sec) { const h = 1 / 60; for (let k = 0; k < sec * 60; k++) { if (paused()) return k / 60; simStep(h); } return sec; },
   draw() { last = performance.now() - 16; frame(performance.now(), true); },
   spawnRival(x, z, tier) { const r = makeRival(x, z, tier, Math.random); r.active = true; S.extraRivals.push(r); activeRivals.push(r); return r; },
